@@ -17,7 +17,7 @@ def train_test_split(data, train_test_ratio, shuffle=False):
         data = random.sample(data, len(data))
     split_index = int(len(data) * train_test_ratio)
     train_data = data[:split_index]
-    test_data = data[split_index]
+    test_data = data[split_index:]
     return train_data, test_data
 
 
