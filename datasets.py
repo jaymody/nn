@@ -1,12 +1,14 @@
+import json
+
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 class MnistStrokeSequencesClassificationDataset(Dataset):
     def __init__(self, data, ignore_first=True):
-        super().__init__()
-
         if ignore_first:
             # we may want to ignore the first datapoint in the sequence, since
             # it contains the initial position of the stroke, this gives away
@@ -22,6 +24,15 @@ class MnistStrokeSequencesClassificationDataset(Dataset):
 
     def __len__(self):
         return len(self.X)
+
+    @staticmethod
+    def load_train_test_data(filepath):
+        with open(filepath) as fi:
+            data = json.load(fi)
+
+        train_data = [d for d in data if d["filename"].split("-")[0] == "trainimg"]
+        test_data = [d for d in data if d["filename"].split("-")[0] == "testimg"]
+        return train_data, test_data
 
     @staticmethod
     def collate_fn(batch):
@@ -83,8 +94,39 @@ class MnistStrokeSequencesClassificationDataset(Dataset):
         with open(output_json_path, "w") as fo:
             json.dump(data, fo)
 
+
+class MnistStrokeSequencesImageDataset(MnistStrokeSequencesClassificationDataset):
+    def __init__(self, data):
+        # we want to ignore the first datapoint in the sequence, since it
+        # contains the initial position of the stroke, which we don't want (we
+        # only want the dx and dy datapoints when drawing the image)
+        sequences = [d["sequence"][1:] for d in data]
+
+        self.X = torch.Tensor(
+            np.array(
+                [
+                    np.array(MnistStrokeSequencesImageDataset.sequence_to_image(seq))
+                    for seq in tqdm(sequences)
+                ]
+            )
+        )
+        self.y = [torch.tensor(d["digit"]) for d in data]
+
+    def __getitem__(self, index):
+        return self.X[index], self.y[index]
+
+    def __len__(self):
+        return len(self.X)
+
     @staticmethod
-    def image_from_sequence(sequence):
+    def tensor_to_image(tensor):
+        from PIL import Image
+
+        image = Image.fromarray(np.array(tensor, dtype=np.uint8))
+        return image
+
+    @staticmethod
+    def sequence_to_image(sequence):
         from PIL import Image, ImageDraw
 
         # draw digit
